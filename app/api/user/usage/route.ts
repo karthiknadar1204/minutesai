@@ -24,7 +24,14 @@ export async function GET(request: NextRequest) {
         .limit(1);
 
         if (!user || user.length === 0) {
-            return NextResponse.json({ error: 'User not found' }, { status: 404 })
+            // Return sensible defaults instead of 404 to avoid client-side errors before webhook creates user
+            return NextResponse.json({
+                currentPlan: 'free',
+                subscriptionStatus: 'inactive',
+                meetingsThisMonth: 0,
+                chatMessagesToday: 0,
+                billingPeriodStart: null,
+            })
         }
 
         return NextResponse.json(user[0])

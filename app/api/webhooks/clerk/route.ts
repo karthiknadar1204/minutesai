@@ -2,6 +2,7 @@ import { db } from "@/lib/db";
 import { users } from "@/database/models";
 import { NextRequest, NextResponse } from "next/server";
 import { Webhook } from 'svix'
+import { eq } from "drizzle-orm";
 
 export async function POST(request: NextRequest) {
     try {
@@ -25,23 +26,34 @@ export async function POST(request: NextRequest) {
         const event = JSON.parse(payload)
         console.log('clerk webhook received', event.type)
 
-        if (event.type === 'user.created') {
-            const { id, email_addresses, first_name, last_name } = event.data
+        if (event.type === 'user.created' || event.type === 'user.updated') {
+            const { id, email_addresses, first_name, last_name, primary_email_address_id } = event.data
             const primaryEmail = email_addresses?.find((email: any) =>
-                email.id === event.data.primary_email_address_id
+                email.id === primary_email_address_id
             )?.email_address
-            console.log('user created', id, primaryEmail)
 
-            const newUser = await db.insert(users).values({
-                data: {
+            const fullName = `${first_name ?? ''} ${last_name ?? ''}`.trim()
+
+            // Upsert by clerkId to be idempotent across replays/updates
+            await db
+                .insert(users)
+                .values({
                     id: id,
                     clerkId: id,
                     email: primaryEmail || null,
-                    name: `${first_name} ${last_name}`
-                }
-            })
-            console.log('user created', newUser.id, newUser.email)
-            return NextResponse.json({ message: "user created successfully" })
+                    name: fullName || null,
+                })
+                .onConflictDoUpdate({
+                    target: users.clerkId,
+                    set: {
+                        email: primaryEmail || null,
+                        name: fullName || null,
+                        updatedAt: new Date(),
+                    },
+                })
+
+            console.log(`user upserted for clerkId=${id} email=${primaryEmail ?? 'null'}`)
+            return NextResponse.json({ message: `user ${event.type} processed` })
         }
 
         return NextResponse.json({ message: 'webhook received' })
