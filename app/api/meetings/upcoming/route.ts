@@ -41,12 +41,36 @@ export async function GET() {
         .orderBy(asc(meetings.startTime))
         .limit(10);
 
+        const parseAttendees = (value: any): string[] => {
+            if (!value) return []
+            try {
+                if (Array.isArray(value)) {
+                    return value.map((v) => String(v).trim()).filter(Boolean)
+                }
+                if (typeof value === 'string') {
+                    try {
+                        const parsed = JSON.parse(value)
+                        if (Array.isArray(parsed)) {
+                            return parsed.map((v: any) => String(v).trim()).filter(Boolean)
+                        }
+                        return String(parsed).split(',').map((v) => v.trim()).filter(Boolean)
+                    } catch {
+                        return value.split(',').map((v) => v.trim()).filter(Boolean)
+                    }
+                }
+                // For objects or other types, best-effort stringify
+                return String(value).split(',').map((v) => v.trim()).filter(Boolean)
+            } catch {
+                return []
+            }
+        }
+
         const events = upcomingMeetings.map(meeting => ({
             id: meeting.calendarEventId || meeting.id,
             summary: meeting.title,
             start: { dateTime: meeting.startTime.toISOString() },
             end: { dateTime: meeting.endTime.toISOString() },
-            attendees: meeting.attendees ? JSON.parse(meeting.attendees as string) : [],
+            attendees: parseAttendees(meeting.attendees),
             hangoutLink: meeting.meetingUrl,
             conferenceData: meeting.meetingUrl ? { entryPoints: [{ uri: meeting.meetingUrl }] } : null,
             botScheduled: meeting.botScheduled,
