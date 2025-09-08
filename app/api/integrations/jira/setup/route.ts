@@ -1,4 +1,6 @@
-import { prisma } from "@/lib/db"
+import { db } from "@/lib/db"
+import { userIntegrations } from "@/database/models"
+import { and, eq } from "drizzle-orm"
 import { JiraAPI } from "@/lib/integrations/jira/jira"
 import { refreshJiraToken } from "@/lib/integrations/jira/refreshToken"
 import { auth } from "@clerk/nextjs/server"
@@ -20,14 +22,11 @@ export async function GET() {
         return NextResponse.json({ error: 'unauthoarized' }, { status: 401 })
     }
 
-    const integration = await prisma.userIntegration.findUnique({
-        where: {
-            userId_platform: {
-                userId: userId,
-                platform: 'jira'
-            }
-        }
-    })
+    const integration = (await db
+        .select()
+        .from(userIntegrations)
+        .where(and(eq(userIntegrations.userId, userId), eq(userIntegrations.platform, 'jira')))
+        .limit(1))[0]
     if (!integration || !integration.workspaceId) {
         return NextResponse.json({ error: 'not connected' }, { status: 400 })
     }
@@ -58,14 +57,11 @@ export async function POST(request: NextRequest) {
     }
 
 
-    const integration = await prisma.userIntegration.findUnique({
-        where: {
-            userId_platform: {
-                userId: userId,
-                platform: 'jira'
-            }
-        }
-    })
+    const integration = (await db
+        .select()
+        .from(userIntegrations)
+        .where(and(eq(userIntegrations.userId, userId), eq(userIntegrations.platform, 'jira')))
+        .limit(1))[0]
     if (!integration || !integration.workspaceId) {
         return NextResponse.json({ error: 'not connected' }, { status: 400 })
     }
@@ -99,9 +95,15 @@ export async function POST(request: NextRequest) {
             }
         }
 
+        // If projectKey is provided from the client, prefer it and avoid extra API calls.
+        else if (projectKey) {
+            finalProjectKey = projectKey
+            finalProjectName = projectName || finalProjectName
+        }
+        // Fallback: if only projectId is provided, fetch projects to resolve name/key
         else if (projectId) {
             const projects = await jira.getProjects(validToken, integration.workspaceId)
-            const selectedProject = projects.values.find(p => p.id === projectId)
+            const selectedProject = projects.values.find((p: any) => p.id === projectId)
 
             if (!selectedProject) {
                 return NextResponse.json({ error: 'project not found' }, { status: 404 })
@@ -114,16 +116,10 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'either projectId or createNew with projectName must be provided' }, { status: 400 })
         }
 
-        await prisma.userIntegration.update({
-            where: {
-                id: integration.id
-            },
-            data: {
-                projectId: finalProjectKey,
-                projectName: finalProjectName,
-
-            }
-        })
+        await db
+            .update(userIntegrations)
+            .set({ projectId: finalProjectKey, projectName: finalProjectName })
+            .where(eq(userIntegrations.id, integration.id))
 
         return NextResponse.json({
             success: true,

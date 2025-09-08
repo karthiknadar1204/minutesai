@@ -1,4 +1,6 @@
-import { prisma } from "@/lib/db";
+import { db } from "@/lib/db";
+import { users } from "@/database/models";
+import { eq } from "drizzle-orm";
 import { auth } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -10,18 +12,16 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        await prisma.user.updateMany({
-            where: {
-                clerkId: userId
-            },
-            data: {
+        await db
+            .update(users)
+            .set({
                 slackConnected: false,
                 slackUserId: null,
                 slackTeamId: null,
                 preferredChannelId: null,
-                preferredChannelName: null
-            }
-        })
+                preferredChannelName: null,
+            })
+            .where(eq(users.clerkId, userId))
 
         return NextResponse.json({ success: true })
     } catch (error) {

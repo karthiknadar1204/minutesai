@@ -1,4 +1,7 @@
-import { prisma } from "@/lib/db";
+import { db } from "@/lib/db";
+import { userIntegrations } from "@/database/models";
+import { eq, and } from "drizzle-orm";
+import { randomUUID } from "crypto";
 import { auth } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -12,23 +15,25 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-        await prisma.userIntegration.upsert({
-            where: {
-                userId_platform: {
-                    userId,
-                    platform: 'trello'
-                }
-            },
-            update: {
-                accessToken: token,
-                updatedAt: new Date()
-            },
-            create: {
+        const existing = await db
+            .select({ id: userIntegrations.id })
+            .from(userIntegrations)
+            .where(and(eq(userIntegrations.userId, userId), eq(userIntegrations.platform, 'trello')))
+            .limit(1)
+
+        if (existing.length > 0) {
+            await db
+                .update(userIntegrations)
+                .set({ accessToken: token, updatedAt: new Date() as any })
+                .where(eq(userIntegrations.id, existing[0].id))
+        } else {
+            await db.insert(userIntegrations).values({
+                id: randomUUID(),
                 userId,
                 platform: 'trello',
-                accessToken: token
-            }
-        })
+                accessToken: token,
+            })
+        }
         return NextResponse.json({ success: true })
     }
     catch (error) {

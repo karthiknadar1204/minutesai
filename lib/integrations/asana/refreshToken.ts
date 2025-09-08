@@ -1,7 +1,8 @@
-import { prisma } from "@/lib/db";
-import { UserIntegration } from "@prisma/client";
+import { db } from "@/lib/db";
+import { userIntegrations } from "@/database/models";
+import { eq } from "drizzle-orm";
 
-export async function refreshAsanaToken(integration: UserIntegration) {
+export async function refreshAsanaToken(integration: any) {
     try {
         const response = await fetch('https://app.asana.com/-/oauth_token', {
             method: 'POST',
@@ -18,18 +19,16 @@ export async function refreshAsanaToken(integration: UserIntegration) {
 
         const data = await response.json()
         if (response.ok) {
-            const updatedIntegration = await prisma.userIntegration.update({
-                where: {
-                    id: integration.id
-                },
-                data: {
+            await db
+                .update(userIntegrations)
+                .set({
                     accessToken: data.access_token,
                     refreshToken: data.refresh_token,
-                    expiresAt: new Date(Date.now() + data.expires_in * 1000)
-                }
-            })
+                    expiresAt: new Date(Date.now() + data.expires_in * 1000) as any,
+                })
+                .where(eq(userIntegrations.id, integration.id))
 
-            return updatedIntegration
+            return { ...integration, accessToken: data.access_token, refreshToken: data.refresh_token, expiresAt: new Date(Date.now() + data.expires_in * 1000) }
         } else {
             console.error('failed to refresh asana token:', data)
             throw new Error('token refreshfailed')

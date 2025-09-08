@@ -1,4 +1,6 @@
-import { prisma } from "@/lib/db";
+import { db } from "@/lib/db";
+import { users, slackInstallations } from "@/database/models";
+import { eq } from "drizzle-orm";
 import { auth } from "@clerk/nextjs/server";
 import { WebClient } from "@slack/web-api";
 import { NextRequest, NextResponse } from "next/server";
@@ -11,21 +13,23 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
         }
 
-        const user = await prisma.user.findFirst({
-            where: {
-                clerkId: userId
-            }
-        })
+        const userRows = await db
+            .select()
+            .from(users)
+            .where(eq(users.clerkId, userId))
+            .limit(1)
+        const user = userRows[0]
 
         if (!user?.slackTeamId) {
             return NextResponse.json({ error: 'slack not connected' }, { status: 400 })
         }
 
-        const installation = await prisma.slackInstallation.findUnique({
-            where: {
-                teamId: user.slackTeamId
-            }
-        })
+        const installationRows = await db
+            .select()
+            .from(slackInstallations)
+            .where(eq(slackInstallations.teamId, user.slackTeamId!))
+            .limit(1)
+        const installation = installationRows[0]
 
         if (!installation) {
             return NextResponse.json({ error: 'installation not found' }, { status: 400 })
@@ -60,15 +64,10 @@ export async function POST(request: NextRequest) {
 
         const { channelId, channelName } = await request.json()
 
-        await prisma.user.updateMany({
-            where: {
-                clerkId: userId
-            },
-            data: {
-                preferredChannelId: channelId,
-                preferredChannelName: channelName
-            }
-        })
+        await db
+            .update(users)
+            .set({ preferredChannelId: channelId, preferredChannelName: channelName })
+            .where(eq(users.clerkId, userId))
         return NextResponse.json({ success: true })
     } catch (error) {
         console.error('Slack setup save error:', error)

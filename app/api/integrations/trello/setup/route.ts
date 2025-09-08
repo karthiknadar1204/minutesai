@@ -1,4 +1,6 @@
-import { prisma } from "@/lib/db";
+import { db } from "@/lib/db";
+import { userIntegrations } from "@/database/models";
+import { eq, and } from "drizzle-orm";
 import { TrelloAPI } from "@/lib/integrations/trello/trello";
 import { auth } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
@@ -10,14 +12,11 @@ export async function GET() {
         return NextResponse.json({ error: 'unauthoarized' }, { status: 401 })
     }
 
-    const integration = await prisma.userIntegration.findUnique({
-        where: {
-            userId_platform: {
-                userId,
-                platform: 'trello'
-            }
-        }
-    })
+    const integration = (await db
+        .select()
+        .from(userIntegrations)
+        .where(and(eq(userIntegrations.userId, userId), eq(userIntegrations.platform, 'trello')))
+        .limit(1))[0]
 
     if (!integration) {
         return NextResponse.json({ error: 'not connected' }, { status: 400 })
@@ -46,14 +45,11 @@ export async function POST(request: NextRequest) {
     }
 
 
-    const integration = await prisma.userIntegration.findUnique({
-        where: {
-            userId_platform: {
-                userId: userId,
-                platform: 'trello'
-            }
-        }
-    })
+    const integration = (await db
+        .select()
+        .from(userIntegrations)
+        .where(and(eq(userIntegrations.userId, userId), eq(userIntegrations.platform, 'trello')))
+        .limit(1))[0]
     if (!integration) {
         return NextResponse.json({ error: 'not connected' }, { status: 400 })
     }
@@ -72,15 +68,10 @@ export async function POST(request: NextRequest) {
             finalBoardName = newBoard.name
         }
 
-        await prisma.userIntegration.update({
-            where: {
-                id: integration.id
-            },
-            data: {
-                boardId: finalBoardId,
-                boardName: finalBoardName
-            }
-        })
+        await db
+            .update(userIntegrations)
+            .set({ boardId: finalBoardId, boardName: finalBoardName })
+            .where(eq(userIntegrations.id, integration.id))
 
         return NextResponse.json({
             success: true,

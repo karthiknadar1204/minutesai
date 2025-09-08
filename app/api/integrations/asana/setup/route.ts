@@ -1,4 +1,6 @@
-import { prisma } from "@/lib/db";
+import { db } from "@/lib/db";
+import { userIntegrations } from "@/database/models";
+import { and, eq } from "drizzle-orm";
 import { AsanaAPI } from "@/lib/integrations/asana/asana";
 import { refreshAsanaToken } from "@/lib/integrations/asana/refreshToken";
 import { auth } from "@clerk/nextjs/server";
@@ -20,14 +22,11 @@ export async function GET() {
         return NextResponse.json({ error: 'unauthoarized' }, { status: 401 })
     }
 
-    const integration = await prisma.userIntegration.findUnique({
-        where: {
-            userId_platform: {
-                userId: userId,
-                platform: 'asana'
-            }
-        }
-    })
+    const integration = (await db
+        .select()
+        .from(userIntegrations)
+        .where(and(eq(userIntegrations.userId, userId), eq(userIntegrations.platform, 'asana')))
+        .limit(1))[0]
     if (!integration) {
         return NextResponse.json({ error: 'not connected' }, { status: 400 })
     }
@@ -65,14 +64,11 @@ export async function POST(request: NextRequest) {
     }
 
 
-    const integration = await prisma.userIntegration.findUnique({
-        where: {
-            userId_platform: {
-                userId: userId,
-                platform: 'asana'
-            }
-        }
-    })
+    const integration = (await db
+        .select()
+        .from(userIntegrations)
+        .where(and(eq(userIntegrations.userId, userId), eq(userIntegrations.platform, 'asana')))
+        .limit(1))[0]
     if (!integration) {
         return NextResponse.json({ error: 'not connected' }, { status: 400 })
     }
@@ -91,16 +87,10 @@ export async function POST(request: NextRequest) {
             finalProjectName = newProject.data.name
         }
 
-        await prisma.userIntegration.update({
-            where: {
-                id: integration.id
-            },
-            data: {
-                projectId: finalProjectId,
-                projectName: finalProjectName,
-                workspaceId: workspaceId
-            }
-        })
+        await db
+            .update(userIntegrations)
+            .set({ projectId: finalProjectId, projectName: finalProjectName, workspaceId: workspaceId })
+            .where(eq(userIntegrations.id, integration.id))
 
         return NextResponse.json({
             success: true,

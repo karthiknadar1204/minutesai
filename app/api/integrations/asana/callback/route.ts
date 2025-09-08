@@ -1,4 +1,7 @@
-import { prisma } from "@/lib/db";
+import { db } from "@/lib/db";
+import { userIntegrations } from "@/database/models";
+import { and, eq } from "drizzle-orm";
+import { randomUUID } from "crypto";
 import { auth } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -35,25 +38,30 @@ export async function GET(request: NextRequest) {
 
         const tokenData = await tokenResponse.json()
 
-        await prisma.userIntegration.upsert({
-            where: {
-                userId_platform: {
-                    userId,
-                    platform: 'asana'
-                }
-            },
-            update: {
-                accessToken: tokenData.access_token,
-                refreshToken: tokenData.refresh_token,
-                updatedAt: new Date()
-            },
-            create: {
+        const existing = await db
+            .select({ id: userIntegrations.id })
+            .from(userIntegrations)
+            .where(and(eq(userIntegrations.userId, userId), eq(userIntegrations.platform, 'asana')))
+            .limit(1)
+
+        const common = {
+            accessToken: tokenData.access_token,
+            refreshToken: tokenData.refresh_token,
+        }
+
+        if (existing.length > 0) {
+            await db
+                .update(userIntegrations)
+                .set({ ...common, updatedAt: new Date() as any })
+                .where(eq(userIntegrations.id, existing[0].id))
+        } else {
+            await db.insert(userIntegrations).values({
+                id: randomUUID(),
                 userId,
                 platform: 'asana',
-                accessToken: tokenData.access_token,
-                refreshToken: tokenData.refresh_token,
-            }
-        })
+                ...common,
+            })
+        }
 
         return NextResponse.redirect(new URL('/integrations?success=asana_connected&setup=asana', process.env.NEXT_PUBLIC_APP_URL))
     } catch (error) {

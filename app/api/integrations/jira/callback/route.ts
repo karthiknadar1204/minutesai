@@ -1,4 +1,7 @@
-import { prisma } from "@/lib/db";
+import { db } from "@/lib/db";
+import { userIntegrations } from "@/database/models";
+import { and, eq } from "drizzle-orm";
+import { randomUUID } from "crypto";
 import { auth } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -55,29 +58,32 @@ export async function GET(request: NextRequest) {
             throw new Error('No accesible jira reosurces found')
         }
 
-        await prisma.userIntegration.upsert({
-            where: {
-                userId_platform: {
-                    userId,
-                    platform: 'jira'
-                }
-            },
-            update: {
-                accessToken: tokenData.access_token,
-                refreshToken: tokenData.refresh_token,
-                expiresAt: new Date(Date.now() + (tokenData.expires_in * 1000)),
-                workspaceId: cloudId,
-                updatedAt: new Date()
-            },
-            create: {
+        const existing = await db
+            .select({ id: userIntegrations.id })
+            .from(userIntegrations)
+            .where(and(eq(userIntegrations.userId, userId), eq(userIntegrations.platform, 'jira')))
+            .limit(1)
+
+        const common = {
+            accessToken: tokenData.access_token,
+            refreshToken: tokenData.refresh_token,
+            expiresAt: new Date(Date.now() + (tokenData.expires_in * 1000)) as any,
+            workspaceId: cloudId,
+        }
+
+        if (existing.length > 0) {
+            await db
+                .update(userIntegrations)
+                .set({ ...common, updatedAt: new Date() as any })
+                .where(eq(userIntegrations.id, existing[0].id))
+        } else {
+            await db.insert(userIntegrations).values({
+                id: randomUUID(),
                 userId,
                 platform: 'jira',
-                accessToken: tokenData.access_token,
-                refreshToken: tokenData.refresh_token,
-                expiresAt: new Date(Date.now() + (tokenData.expires_in * 1000)),
-                workspaceId: cloudId,
-            }
-        })
+                ...common,
+            })
+        }
 
         return NextResponse.redirect(new URL('/integrations?success=jira_connected&setup=jira', process.env.NEXT_PUBLIC_APP_URL))
     } catch (error) {

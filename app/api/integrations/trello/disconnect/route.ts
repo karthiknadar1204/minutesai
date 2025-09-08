@@ -1,4 +1,6 @@
-import { prisma } from "@/lib/db";
+import { db } from "@/lib/db";
+import { userIntegrations } from "@/database/models";
+import { and, eq } from "drizzle-orm";
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 
@@ -10,14 +12,9 @@ export async function POST() {
     }
 
     try {
-        await prisma.userIntegration.delete({
-            where: {
-                userId_platform: {
-                    userId,
-                    platform: 'trello'
-                }
-            }
-        })
+        await db
+            .delete(userIntegrations)
+            .where(and(eq(userIntegrations.userId, userId), eq(userIntegrations.platform, 'trello')))
 
         return NextResponse.json({ success: true })
     } catch (error) {

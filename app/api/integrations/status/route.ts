@@ -1,4 +1,6 @@
-import { prisma } from "@/lib/db";
+import { db } from "@/lib/db";
+import { users, userIntegrations } from "@/database/models";
+import { eq } from "drizzle-orm";
 import { currentUser } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 
@@ -10,11 +12,10 @@ export async function GET() {
             return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
         }
 
-        const integrations = await prisma.userIntegration.findMany({
-            where: {
-                userId: user.id
-            }
-        })
+        const integrations = await db
+            .select()
+            .from(userIntegrations)
+            .where(eq(userIntegrations.userId, user.id))
 
         const allPlatforms = [
             { platform: 'trello', name: 'Trello', logo: '🔷', connected: false },
@@ -23,7 +24,7 @@ export async function GET() {
         ]
 
         const result: any[] = allPlatforms.map(platform => {
-            const integration = integrations.find(i => i.platform === platform.platform)
+            const integration: any = integrations.find(i => i.platform === platform.platform)
             return {
                 ...platform,
                 connected: !!integration,
@@ -32,11 +33,12 @@ export async function GET() {
             }
         })
 
-        const dbUser = await prisma.user.findFirst({
-            where: {
-                clerkId: user.id
-            }
-        })
+        const dbUserRows = await db
+            .select()
+            .from(users)
+            .where(eq(users.clerkId, user.id))
+            .limit(1)
+        const dbUser = dbUserRows[0]
 
         if (dbUser?.slackConnected) {
             result.push({
