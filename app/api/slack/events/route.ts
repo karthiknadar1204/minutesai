@@ -1,9 +1,9 @@
 import { App } from '@slack/bolt'
 import { authorizeSlack } from './utils/slack-auth'
-import { handleAppMention } from './handlers/app-mention'
 import { handleMessage } from './handlers/message'
 import { NextRequest, NextResponse } from 'next/server'
 import { verifySlackSignature } from './utils/verifySlackSignature'
+import { handleAppMention } from './handlers/app-mention'
 
 const app = new App({
     signingSecret: process.env.SLACK_SIGNING_SECRET!,
@@ -16,7 +16,22 @@ app.message(handleMessage)
 export async function POST(req: NextRequest) {
     try {
         const body = await req.text()
-        const bodyJson = JSON.parse(body)
+        const contentType = req.headers.get('content-type') || ''
+
+        if (!body || body.trim().length === 0) {
+            // Nothing to process; acknowledge to avoid Slack retries
+            return NextResponse.json({ ok: true })
+        }
+
+        let bodyJson: any
+        if (contentType.includes('application/json')) {
+            bodyJson = JSON.parse(body)
+        } else {
+            // Handle urlencoded payloads (e.g., some Slack flows)
+            const params = new URLSearchParams(body)
+            const payload = params.get('payload')
+            bodyJson = payload ? JSON.parse(payload) : Object.fromEntries(params)
+        }
 
         if (bodyJson.type === 'url_verification') {
             return NextResponse.json({ challenge: bodyJson.challenge })

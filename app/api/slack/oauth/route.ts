@@ -50,6 +50,7 @@ export async function GET(request: NextRequest) {
         await db
             .insert(slackInstallations)
             .values({
+                id: tokenData.team.id,
                 teamId: tokenData.team.id,
                 teamName: tokenData.team.name,
                 botToken: tokenData.access_token,
