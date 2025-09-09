@@ -3,39 +3,27 @@ import { isDuplicateEvent } from "../utils/deduplicate"
 import { users } from "@/database/models"
 import { eq } from "drizzle-orm"
 
-export async function handleMessage({ message, say, client }: any) {
+export async function handleAppMention({ event, say, client }: any) {
     try {
-        if (message.subtype === 'bot message' || !('user' in message) || !('text' in message)) {
-            return
-        }
-
-        if (message.user && message.user.startsWith('B')) {
-            return
-        }
-        const authTest = await client.auth.test()
-
-        if (message.user == authTest.user_id) {
-            return
-        }
-
-        const text = message.text || ''
-
-        if (text.includes(`<@${authTest.user_id}>`)) {
-            return
-        }
-
-        const eventId = `message-${message.channel}-${message.user}`
-        const eventTs = message.ts
+        const eventId = `app_mention-${event.channel}-${event.user}`
+        const eventTs = event.event_ts || event.ts
 
         if (isDuplicateEvent(eventId, eventTs)) {
             return
         }
 
-        const slackUserId = message.user
+        const authTest = await client.auth.test()
+        if (event.user === authTest.user_id) {
+            return
+        }
+
+        const slackUserId = event.user
 
         if (!slackUserId) {
             return
         }
+
+        const text = event.text || ''
 
         const cleanText = text.replace(/<@[^>]+>/g, '').trim()
 
@@ -79,7 +67,8 @@ export async function handleMessage({ message, say, client }: any) {
         }
 
         const { team_id: teamId } = await client.auth.test()
-        await db.update(users)
+        await db
+            .update(users)
             .set({
                 slackUserId: slackUserId,
                 slackTeamId: teamId as string,
