@@ -1,7 +1,9 @@
-import { prisma } from "@/lib/db";
+import { db } from "@/lib/db";
 import { processTranscript } from "@/lib/rag";
 import { auth } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
+import { meetings } from "@/database/models";
+import { and, eq } from "drizzle-orm";
 
 export async function POST(request: NextRequest) {
     const { userId } = await auth()
@@ -17,14 +19,9 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-        const meeting = await prisma.meeting.findUnique({
-            where: {
-                id: meetingId
-            },
-            select: {
-                ragProcessed: true,
-                userId: true
-            }
+        const meeting = await db.query.meetings.findFirst({
+            where: and(eq(meetings.id, meetingId), eq(meetings.userId, userId)),
+            columns: { ragProcessed: true, userId: true },
         })
 
         if (!meeting) {
@@ -41,15 +38,10 @@ export async function POST(request: NextRequest) {
 
         await processTranscript(meetingId, userId, transcript, meetingTitle)
 
-        await prisma.meeting.update({
-            where: {
-                id: meetingId
-            },
-            data: {
-                ragProcessed: true,
-                ragProcessedAt: new Date()
-            }
-        })
+        await db
+            .update(meetings)
+            .set({ ragProcessed: true, ragProcessedAt: new Date() as any })
+            .where(eq(meetings.id, meetingId))
 
         return NextResponse.json({ success: true })
 

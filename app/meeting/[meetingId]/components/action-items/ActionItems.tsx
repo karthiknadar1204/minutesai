@@ -3,7 +3,7 @@ import { ActionItem, useActionItems } from '../../hooks/useActionItems'
 import { Button } from '@/components/ui/button'
 import ActionItemsList from './ActionItemsList'
 import AddActionItemInput from './AddActionItemInput'
-import { toast } from 'sonner'
+// import { toast } from 'sonner'
 
 export interface ActionItemsProps {
     actionItems: ActionItem[]
@@ -32,12 +32,12 @@ function ActionItems({
     const addToIntegration = async (platform: string, actionItem: ActionItem) => {
         setLoading(prev => ({ ...prev, [`${platform}-${actionItem.id}`]: true }))
         try {
-            toast(`✅ Action item added to ${platform}`, {
-                action: {
-                    label: "OK",
-                    onClick: () => { },
-                },
-            })
+            // toast(`✅ Action item added to ${platform}`, {
+            //     action: {
+            //         label: "OK",
+            //         onClick: () => { },
+            //     },
+            // })
             const response = await fetch('/api/integrations/action-items', {
                 method: 'POST',
                 headers: {
@@ -60,12 +60,12 @@ function ActionItems({
         }
 
         try {
-            toast(`✅ Action item added`, {
-                action: {
-                    label: "OK",
-                    onClick: () => { },
-                },
-            })
+            // toast(`✅ Action item added`, {
+            //     action: {
+            //         label: "OK",
+            //         onClick: () => { },
+            //     },
+            // })
             const response = await fetch(`/api/meetings/${meetingId}/action-items`, {
                 method: 'POST',
                 headers: {
@@ -88,12 +88,12 @@ function ActionItems({
 
     const handleDeleteItem = async (id: number) => {
         try {
-            toast(`✅ Action item deleted`, {
-                action: {
-                    label: "OK",
-                    onClick: () => { },
-                },
-            })
+            // toast(`✅ Action item deleted`, {
+            //     action: {
+            //         label: "OK",
+            //         onClick: () => { },
+            //     },
+            // })
             const response = await fetch(`/api/meetings/${meetingId}/action-items/${id}`, {
                 method: 'DELETE'
             })

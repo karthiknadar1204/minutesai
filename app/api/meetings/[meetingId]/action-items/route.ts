@@ -1,6 +1,8 @@
-import { prisma } from "@/lib/db";
+import { db } from "@/lib/db";
 import { auth } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
+import { meetings } from "@/database/models";
+import { and, eq } from "drizzle-orm";
 
 export async function POST(
     request: NextRequest,
@@ -16,18 +18,15 @@ export async function POST(
 
         const { text } = await request.json()
         const { meetingId } = await params
-        const meeting = await prisma.meeting.findFirst({
-            where: {
-                id: meetingId,
-                userId: userId
-            }
+        const meeting = await db.query.meetings.findFirst({
+            where: and(eq(meetings.id, meetingId), eq(meetings.userId, userId))
         })
 
         if (!meeting) {
             return NextResponse.json({ error: 'meeting not found' }, { status: 404 })
         }
 
-        const existingItems = meeting.actionItems as any[] || []
+        const existingItems = (meeting.actionItems as any[]) || []
         const nextId = existingItems.length > 0
             ? Math.max(...existingItems.map((item: any) => item.id || 0)) + 1
             : 1
@@ -39,14 +38,10 @@ export async function POST(
 
         const updatedActionItems = [...existingItems, newActionItem]
 
-        await prisma.meeting.update({
-            where: {
-                id: meetingId
-            },
-            data: {
-                actionItems: updatedActionItems
-            }
-        })
+        await db
+            .update(meetings)
+            .set({ actionItems: updatedActionItems as any })
+            .where(eq(meetings.id, meetingId))
 
         return NextResponse.json(newActionItem)
     } catch (error) {

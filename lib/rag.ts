@@ -1,7 +1,9 @@
-import { prisma } from "./db";
+import { db } from "./db";
 import { chatWithAI, createEmbedding, createManyEmbeddings } from "./openai";
 import { saveManyVectors, searchVectors } from "./pinecone";
 import { chunkTranscript, extractSpeaker } from "./text-chunker";
+import { transcriptChunks, meetings } from "@/database/models";
+import { and, eq } from "drizzle-orm";
 
 export async function processTranscript(
     meetingId: string,
@@ -16,6 +18,7 @@ export async function processTranscript(
     const embeddings = await createManyEmbeddings(texts)
 
     const dbChunks = chunks.map((chunk) => ({
+        id: `${meetingId}_chunk_${chunk.chunkIndex}`,
         meetingId,
         chunkIndex: chunk.chunkIndex,
         content: chunk.content,
@@ -23,10 +26,10 @@ export async function processTranscript(
         vectorId: `${meetingId}_chunk_${chunk.chunkIndex}`
     }))
 
-    await prisma.transcriptChunk.createMany({
-        data: dbChunks,
-        skipDuplicates: true
-    })
+    await db
+        .insert(transcriptChunks)
+        .values(dbChunks as any)
+        .onConflictDoNothing({ target: transcriptChunks.id })
 
     const vectors = chunks.map((chunk, index) => ({
         id: `${meetingId}_chunk_${chunk.chunkIndex}`,
@@ -58,10 +61,8 @@ export async function chatWithMeeting(
         5
     )
 
-    const meeting = await prisma.meeting.findUnique({
-        where: {
-            id: meetingId
-        }
+    const meeting = await db.query.meetings.findFirst({
+        where: eq(meetings.id, meetingId),
     })
 
     const context = results

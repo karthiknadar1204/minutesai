@@ -44,8 +44,8 @@ export function UsageProvider({ children }: { children: ReactNode }) {
     const limits = usage ? PLAN_LIMITS[usage.currentPlan] || PLAN_LIMITS.free : PLAN_LIMITS.free
 
     const canChat = usage ? (
-        usage.currentPlan !== 'free' &&
-        usage.subscriptionStatus === 'active' &&
+        // Allow free plan within limits; require active subscription for paid tiers
+        ((usage.currentPlan === 'free') || (usage.subscriptionStatus === 'active')) &&
         (limits.chatMessages === -1 || usage.chatMessagesToday < limits.chatMessages)
     ) : false
 

@@ -1,7 +1,9 @@
 
-import { prisma } from "@/lib/db";
+import { db } from "@/lib/db";
 import { auth } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
+import { meetings } from "@/database/models";
+import { and, eq } from "drizzle-orm";
 
 export async function DELETE(
     request: NextRequest,
@@ -17,11 +19,8 @@ export async function DELETE(
         const { meetingId, itemId } = await params
         const itemIdNumber = parseInt(itemId)
 
-        const meeting = await prisma.meeting.findFirst({
-            where: {
-                id: meetingId,
-                userId: userId
-            }
+        const meeting = await db.query.meetings.findFirst({
+            where: and(eq(meetings.id, meetingId), eq(meetings.userId, userId))
         })
 
         if (!meeting) {
@@ -31,14 +30,10 @@ export async function DELETE(
         const actionItems = (meeting.actionItems as any[]) || []
         const updatedActionItems = actionItems.filter((item: any) => item.id !== itemIdNumber)
 
-        await prisma.meeting.update({
-            where: {
-                id: meetingId
-            },
-            data: {
-                actionItems: updatedActionItems
-            }
-        })
+        await db
+            .update(meetings)
+            .set({ actionItems: updatedActionItems as any })
+            .where(eq(meetings.id, meetingId))
 
         return NextResponse.json({ success: true })
 

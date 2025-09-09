@@ -1,7 +1,9 @@
-import { prisma } from "@/lib/db";
+import { db } from "@/lib/db";
 import { chatWithAllMeetings } from "@/lib/rag";
 import { auth } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
+import { users } from "@/database/models";
+import { eq } from "drizzle-orm";
 
 export async function POST(request: NextRequest) {
     try {
@@ -21,13 +23,9 @@ export async function POST(request: NextRequest) {
 
             targetUserId = clerkUserId
         } else {
-            const user = await prisma.user.findUnique({
-                where: {
-                    id: slackUserId
-                },
-                select: {
-                    clerkId: true
-                }
+            const user = await db.query.users.findFirst({
+                where: eq(users.id, slackUserId),
+                columns: { clerkId: true },
             })
 
             if (!user) {

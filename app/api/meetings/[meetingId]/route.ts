@@ -13,20 +13,28 @@ export async function GET(
 
         const { meetingId } = await params
 
-        const meeting = await db.select({
-            id: meetings.id,
-            calendarEventId: meetings.calendarEventId,
-            title: meetings.title,
-            startTime: meetings.startTime,
-            endTime: meetings.endTime,
-            attendees: meetings.attendees,
-            meetingUrl: meetings.meetingUrl,
-            botScheduled: meetings.botScheduled,
-            user: users
-        })
-        .from(meetings)
-        .where(eq(meetings.id, meetingId))
-        .limit(1);
+        const meeting = await db
+            .select({
+                id: meetings.id,
+                calendarEventId: meetings.calendarEventId,
+                title: meetings.title,
+                startTime: meetings.startTime,
+                endTime: meetings.endTime,
+                attendees: meetings.attendees,
+                meetingUrl: meetings.meetingUrl,
+                botScheduled: meetings.botScheduled,
+                summary: meetings.summary,
+                processed: meetings.processed,
+                transcript: meetings.transcript,
+                actionItems: meetings.actionItems,
+                recordingUrl: meetings.recordingUrl,
+                userId: meetings.userId,
+                user: users,
+            })
+            .from(meetings)
+            .leftJoin(users, eq(users.id, meetings.userId))
+            .where(eq(meetings.id, meetingId))
+            .limit(1);
 
         if (!meeting[0]) {
             return NextResponse.json({ error: 'meeting not found' }, { status: 404 })
@@ -34,7 +42,7 @@ export async function GET(
 
         const responseData = {
             ...meeting[0],
-            isOwner: clerkUserId === meeting[0].user?.clerkId
+            isOwner: clerkUserId === meeting[0].user?.clerkId,
         }
 
         return NextResponse.json(responseData)
@@ -46,7 +54,7 @@ export async function GET(
 
 export async function DELETE(
     request: NextRequest,
-    { params }: { params: { meetingId: string } }
+    { params }: { params: Promise<{ meetingId: string }> }
 ) {
     try {
         const { userId } = await auth()
@@ -55,28 +63,36 @@ export async function DELETE(
             return NextResponse.json({ error: 'not authenticated' }, { status: 401 })
         }
 
-        const { meetingId } = params
+        const { meetingId } = await params
 
-        const meeting = await db.select({
-            id: meetings.id,
-            calendarEventId: meetings.calendarEventId,
-            title: meetings.title,
-            startTime: meetings.startTime,
-            endTime: meetings.endTime,
-            attendees: meetings.attendees,
-            meetingUrl: meetings.meetingUrl,
-            botScheduled: meetings.botScheduled,
-            user: users
-        })
-        .from(meetings)
-        .where(eq(meetings.id, meetingId))
-        .limit(1);
+        const meeting = await db
+            .select({
+                id: meetings.id,
+                calendarEventId: meetings.calendarEventId,
+                title: meetings.title,
+                startTime: meetings.startTime,
+                endTime: meetings.endTime,
+                attendees: meetings.attendees,
+                meetingUrl: meetings.meetingUrl,
+                botScheduled: meetings.botScheduled,
+                summary: meetings.summary,
+                processed: meetings.processed,
+                transcript: meetings.transcript,
+                actionItems: meetings.actionItems,
+                recordingUrl: meetings.recordingUrl,
+                userId: meetings.userId,
+                user: users,
+            })
+            .from(meetings)
+            .leftJoin(users, eq(users.id, meetings.userId))
+            .where(eq(meetings.id, meetingId))
+            .limit(1);
 
         if (!meeting[0]) {
             return NextResponse.json({ error: 'meeting not found' }, { status: 404 })
         }
 
-        if (meeting[0].user.clerkId !== userId) {
+        if (meeting[0].user?.clerkId !== userId) {
             return NextResponse.json({ error: 'not authorized to delete this meeting' }, { status: 403 })
         }
 

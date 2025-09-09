@@ -1,6 +1,6 @@
 import { db } from "./db"
 import { users } from "../database/models"
-import { eq } from "drizzle-orm"
+import { eq, sql } from "drizzle-orm"
 
 interface PlanLimits {
     meetings: number
@@ -56,14 +56,11 @@ export async function canUserChat(userId: string) {
 
     const userData = user[0]
 
-    if (userData.currentPlan === 'free' || userData.subscriptionStatus === 'expired') {
-        return { allowed: false, reason: 'Upgrade your plan to chat with out AI bot' }
-    }
+    // Allow free plan within daily limit. Paid tiers require active subscription.
+    const limits = PLAN_LIMITS[userData.currentPlan] || PLAN_LIMITS.free
 
-    const limits = PLAN_LIMITS[userData.currentPlan]
-
-    if (!limits) {
-        return { allowed: false, reason: 'invalid subscription plan' }
+    if (userData.currentPlan !== 'free' && userData.subscriptionStatus !== 'active') {
+        return { allowed: false, reason: 'Upgrade your plan to chat with our AI bot' }
     }
 
     if (limits.chatMessages !== -1 && userData.chatMessagesToday >= limits.chatMessages) {
@@ -76,7 +73,7 @@ export async function canUserChat(userId: string) {
 export async function incrementMeetingUsage(userId: string) {
     await db.update(users)
         .set({
-            meetingsThisMonth: users.meetingsThisMonth + 1
+            meetingsThisMonth: sql`${users.meetingsThisMonth} + 1`
         })
         .where(eq(users.id, userId))
 }
@@ -84,7 +81,7 @@ export async function incrementMeetingUsage(userId: string) {
 export async function incrementChatUsage(userId: string) {
     await db.update(users)
         .set({
-            chatMessagesToday: users.chatMessagesToday + 1
+            chatMessagesToday: sql`${users.chatMessagesToday} + 1`
         })
         .where(eq(users.id, userId))
 }
