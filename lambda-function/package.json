@@ -1,0 +1,10 @@
+{
+    "name": "bot-scheduler-lambda",
+    "version": "1.0.0",
+    "type": "module",
+    "dependencies": {
+        "drizzle-orm": "^0.29.0",
+        "postgres": "^3.4.0",
+        "google-auth-library": "^9.0.0"
+    }
+}
